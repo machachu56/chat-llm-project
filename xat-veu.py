@@ -1,4 +1,4 @@
-from utils import WhisperAPI, OllamaAPI, uploadToServer, record, TTSEsp, TTSGoogle
+from utils import WhisperAPI, OllamaAPI, uploadToServer, recordDetectSilenci, record, TTSKokoroESP, TTSGoogle
 import json
 import time
 import os
@@ -36,8 +36,8 @@ def historialText(history, promptText, language):
 
 
 while True:
-    # Gravar amb Whisper - Procés
-    gravacio = record()
+    # Gravar amb detecció de silenci - Procés
+    gravacio = recordDetectSilenci()
 
     # Funció per pujar arxiu al servidor HTTP
     uploadToServer("tmp/tmp.wav")
@@ -52,8 +52,8 @@ while True:
     
     print("Generant audio...")
     
-    if(idioma == "LOCAL-ES"):
-        TTSEsp(text=respostaText)
+    if(idioma == "es"):
+        TTSKokoroESP(text=respostaText)
     else:
         TTSGoogle(text=respostaText, lang=idioma)
     

@@ -1,6 +1,5 @@
 from ollama import chat, Client
 import requests
-import pyaudio
 import wave
 from colorama import Fore, Back, Style, init
 import sounddevice as sd
@@ -8,6 +7,9 @@ import numpy as np
 import io
 from gtts import gTTS
 from pydub import AudioSegment
+from openai import OpenAI
+import pyaudio
+import time
 
 # Creació de classe per Ollama i parametres
 class OllamaAPI:
@@ -79,7 +81,92 @@ class WhisperAPI:
         return response.json()
     
 
+
+def recordDetectSilenci(output_filename="tmp/tmp.wav", threshold=10, silence_limit=1.5, debug=False):
+    """
+    Records audio from the microphone until silence is detected and saves it to a WAV file.
     
+    Parameters:
+        output_filename (str): Name of the output WAV file.
+        threshold (int): RMS threshold below which audio is considered silent.
+        silence_limit (float): Duration in seconds of continuous silence to trigger stopping.
+    """
+    
+    init()
+    print(Fore.GREEN + "Gravant..." + Style.RESET_ALL)
+    # Audio configuration
+    FORMAT = pyaudio.paInt16  # 16-bit resolution
+    CHANNELS = 1              # Mono recording
+    RATE = 44100              # Sampling rate in Hz
+    CHUNK = 1024              # Frames per buffer
+
+    # Determine how many consecutive silent chunks are required to consider it silence
+    silence_chunks = int(RATE / CHUNK * silence_limit)
+
+    # Initialize PyAudio
+    audio = pyaudio.PyAudio()
+    stream = audio.open(format=FORMAT,
+                        channels=CHANNELS,
+                        rate=RATE,
+                        input=True,
+                        frames_per_buffer=CHUNK)
+    frames = []
+    silent_chunk_count = 0
+    # Use a list to create a sliding window for RMS smoothing
+    window_size = 10
+    rms_window = []
+
+    try:
+        while True:
+            data = stream.read(CHUNK)
+            frames.append(data)
+            
+            # Convert byte data to a NumPy array of type int16
+            audio_data = np.frombuffer(data, dtype=np.int16)
+            # Calculate current RMS value using NumPy
+            current_rms = np.sqrt(np.mean(audio_data**2))
+            
+            # Update the sliding window using a list
+            if len(rms_window) < window_size:
+                rms_window.append(current_rms)
+            else:
+                rms_window = rms_window[1:] + [current_rms]
+            
+            avg_rms = sum(rms_window) / len(rms_window)
+            
+            if debug == True:
+                print(f"Current RMS: {current_rms:.2f}, Average RMS: {avg_rms:.2f}")
+            
+            # Increase silent counter if the average RMS is below the threshold
+            if avg_rms < threshold:
+                silent_chunk_count += 1
+            else:
+                silent_chunk_count = 0  # Reset counter if sound is detected
+            
+            # Stop recording if silence persists for the specified number of chunks
+            if silent_chunk_count > silence_chunks:
+                print("Silenci detectat, procedint.")
+                break
+    except KeyboardInterrupt:
+        print("Recording interrupted by user.")
+    
+    # Clean up: stop and close the stream, then terminate PyAudio
+    stream.stop_stream()
+    stream.close()
+    audio.terminate()
+
+    # Save the recorded frames as a WAV file
+    wf = wave.open(output_filename, 'wb')
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(audio.get_sample_size(FORMAT))
+    wf.setframerate(RATE)
+    wf.writeframes(b''.join(frames))
+    wf.close()
+
+    print(f"Audio saved to {output_filename}")
+    
+
+
 # Funció feta per ChatGPT
 def record():
     print("Parla al micròfon")
@@ -151,6 +238,26 @@ def TTSEsp(text):
         sd.wait()
     else:
         print(response.status_code)
+
+def TTSKokoroESP(text):
+    client = OpenAI(
+    base_url="http://100.73.165.91:7777/v1", api_key="x")
+    player = pyaudio.PyAudio().open(
+    format=pyaudio.paInt16, 
+    channels=1, 
+    rate=24000, 
+    output=True
+    )
+
+    with client.audio.speech.with_streaming_response.create(
+        model="kokoro",
+        voice="ef_dora",
+        response_format="pcm",
+        input=text
+    ) as response:
+        for chunk in response.iter_bytes(chunk_size=1024):
+            player.write(chunk)
+
 
 def TTSGoogle(text, lang):
     fp = io.BytesIO()
