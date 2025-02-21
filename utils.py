@@ -65,7 +65,7 @@ class WhisperAPI:
         self.tasca = tasca
         # Idioma de la gravació
         self.idioma = idioma
-        # Batch size de la tasca (+ és més ràpid pero més costós de VRAM)
+        # Batch size de la tasca (+ és més ràpid però més costós de VRAM)
         self.batch_size = batch_size
     
     # Transcriure amb Whisper
@@ -142,10 +142,12 @@ def TTSEsp(text):
     json = {"text": text}
     headers = {"Content-Type": "application/json"}
     response = requests.post(url=f"http://100.73.165.91:5130/convert/tts", headers=headers, json=json)
-    if response.status_code == 200:   
-        # Play the sound
+    if response.status_code == 200:  
+        # Llegir .wav 
         bytes, wav_file = readBytesWav(response.content)
+        # Reproduir so
         sd.play(bytes, samplerate=wav_file.getframerate())
+        # Congelar fins que acabi la reproducció
         sd.wait()
     else:
         print(response.status_code)
