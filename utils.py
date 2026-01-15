@@ -1,4 +1,3 @@
-from ollama import chat, Client
 import requests
 import wave
 from colorama import Fore, Back, Style, init
@@ -12,8 +11,8 @@ import pyaudio
 import time
 
 # Creació de classe per Ollama i parametres
-class OllamaAPI:
-    def __init__(self, model, context=4096, max_tokens = 1, temp=0.5, top_p=0.9, api_url='http://10.66.66.10:11434'):
+class OpenAILLMLocal:
+    def __init__(self, model, context=32768, max_tokens = 1, temp=0.5, top_p=0.9, api_url='http://192.168.99.2:8080/v1/'):
         # URL amb port d'Ollama
         self.api_url = api_url
         # Temperatura: Marca la variabilitat del text generat
@@ -26,59 +25,64 @@ class OllamaAPI:
         self.max_tokens = max_tokens
         # Context: Màxims tokens que el model pot recordar
         self.context = context
-    
-    # Mètode per generar text
+
     def generate(self, prompt):
-        # Inicialització del client Ollama
-        client = Client(host=self.api_url)
-        # Input a enviar al model
-        response = client.chat(model=self.model, messages=[
-            {
-                'role': 'user',
-                'content': f'{prompt}',
-            },
-        ],
-        #Opcions/parametres a enviar al model
-        options={
-            "temperature": self.temp,
-            "top_p": self.top_p,
-            "num_predict": self.max_tokens,
-            "num_ctx": self.context
-        }
+        # Inicialització del client compatible amb OpenAI
+        # 'api_key' és necessari; si és local, pots posar 'ollama' o 'no-key'
+        client = OpenAI(
+            base_url=self.api_url, 
+            api_key="x" 
         )
-        return response
+
+        # Petició al model
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            # Mapeig de paràmetres d'Ollama a OpenAI
+            temperature=self.temp,
+            top_p=self.top_p,
+            max_tokens=self.max_tokens,
+        )
+
+        # Retornem l'objecte de resposta o el text directament
+        # Per obtenir el text: response.choices[0].message.content
+        return response.choices[0].message.content
 
 
 # Funcio per pujar arxius al servidor
-def uploadToServer(arxiu, host='100.73.165.91:4555'):
+def uploadToServer(arxiu, host='192.168.99.2:4555'):
     with open(arxiu, 'rb') as f:
         arxiu = f.read()
         requests.put(headers={'Content-Type': 'application/json'}, url=f'http://{host}/so/tmp.wav', data=arxiu)
         f.close()
 
 # Creació de classe per Whisper i parametres
-class WhisperAPI:
-    def __init__(self, urlarxiu, tasca, idioma, batch_size, api_url='http://100.73.165.91:9000'):
+class STTAPI:
+    def __init__(self, file_name: str, api_url='http://192.168.99.2:9000'):
         # URL amb port del Whisper Docker que vaig trobar
         self.api_url = api_url
         # URL de l'arxiu a transcriure, no es pot pujar arxiu directament
-        self.urlarxiu = urlarxiu
-        # Tasca a realitzar (transcriure o traduir)
-        self.tasca = tasca
-        # Idioma de la gravació
-        self.idioma = idioma
-        # Batch size de la tasca (+ és més ràpid però més costós de VRAM)
-        self.batch_size = batch_size
+        self.file_name = file_name
     
     # Transcriure amb Whisper
-    def transcribe_whisper(self):
-        response = requests.post(url=self.api_url, json={
-            "url": self.urlarxiu,
-            "task": self.tasca,
-            "language": self.idioma,
-            "batch_size": self.batch_size
-        })
-        return response.json()
+    def transcribe_stt(self):
+        client = OpenAI(
+        base_url="http://192.168.99.2:5092/v1",
+        api_key="x"
+        )
+        audio_file = open(self.file_name, "rb")
+        transcript = client.audio.transcriptions.create(
+        model="parakeet-tdt-0.6b-v3",
+        file=audio_file,
+        response_format="text"
+        )
+
+        return transcript
     
 
 
@@ -239,9 +243,31 @@ def TTSEsp(text):
     else:
         print(response.status_code)
 
+def TTSChatterBox(text, api_url, voice):
+    #print(f"Enviando solicitud a llama-server...")
+    
+    # 2. Usamos el método estándar de OpenAI
+    client = OpenAI(
+            base_url=api_url, 
+            api_key="x")
+    
+    player = pyaudio.PyAudio().open(
+            format=pyaudio.paInt16, 
+            channels=1, 
+            rate=24000, 
+            output=True)
+
+    with client.audio.speech.with_streaming_response.create(
+        model="chatterbox-tts-1",
+        voice=voice,             # Dependerá de las voces que soporte tu backend
+        input=text,
+    ) as response:
+        for chunk in response.iter_bytes(chunk_size=1024):
+            player.write(chunk)
+
 def TTSKokoroESP(text):
     client = OpenAI(
-    base_url="http://100.73.165.91:7777/v1", api_key="x")
+    base_url="http://100.73.165.91:8880/v1", api_key="x")
     player = pyaudio.PyAudio().open(
     format=pyaudio.paInt16, 
     channels=1, 

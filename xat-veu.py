@@ -1,4 +1,4 @@
-from utils import WhisperAPI, OllamaAPI, uploadToServer, recordDetectSilenci, record, TTSKokoroESP, TTSGoogle
+from utils import STTAPI, OpenAILLMLocal, TTSChatterBox, uploadToServer, recordDetectSilenci, record, TTSKokoroESP, TTSGoogle
 import json
 import time
 import os
@@ -13,10 +13,10 @@ elif idioma == "en":
     nomAsistent = "Assistant: "
 
 # Inicialitzar classe amb els següents paràmetres
-ollama = OllamaAPI(temp=0.5, top_p=0.9, max_tokens=350, model='llama3.2', api_url='http://100.73.165.91:11434')
+llm = OpenAILLMLocal(temp=0.5, top_p=0.9, max_tokens=350, model='qwen3:4b', api_url='http://192.168.99.2:8080/v1/')
 
 # Inicialitzar whisper amb els següents paràmetres
-whisper = WhisperAPI(tasca='transcribe', idioma=idioma, batch_size=64, urlarxiu="http://100.73.165.91:4555/so/tmp.wav")
+stt = STTAPI(file_name="tmp/tmp.wav", api_url="http://192.168.99.2:5092/v1/")
 
 
 history = []
@@ -39,21 +39,19 @@ while True:
     # Gravar amb detecció de silenci - Procés
     gravacio = recordDetectSilenci()
 
-    # Funció per pujar arxiu al servidor HTTP
-    uploadToServer("tmp/tmp.wav")
-
     # Transcriure amb Whisper - Procés, extreure JSON i mostrar text
-    outputSTT = whisper.transcribe_whisper()['output']['text']
+    outputSTT = stt.transcribe_stt()
     print(outputSTT)
 
     # Generar amb Ollama - Procés
-    respostaText = ollama.generate(historialText(history=history, promptText=outputSTT, language=idioma))['message']['content']
+    respostaText = llm.generate(historialText(history=history, promptText=outputSTT, language=idioma))
     print(respostaText)
     
     print("Generant audio...")
     
     if(idioma == "es"):
-        TTSKokoroESP(text=respostaText)
+        #TTSKokoroESP(text=respostaText)
+        TTSKokoroESP(api_url="http://192.168.99.2:4123/v1/", text=respostaText, voice="gladosesp")
     else:
         TTSGoogle(text=respostaText, lang=idioma)
     
