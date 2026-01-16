@@ -1,4 +1,5 @@
 from utils import STTAPI, OpenAILLMLocal, TTSChatterBox, uploadToServer, recordDetectSilenci, record, TTSKokoroESP, TTSGoogle
+from vad import recordDetectSilenciSOTA
 import json
 import time
 import os
@@ -14,6 +15,7 @@ elif idioma == "en":
 
 # Inicialitzar classe amb els següents paràmetres
 llm = OpenAILLMLocal(temp=0.5, top_p=0.9, max_tokens=350, model='qwen3:4b', api_url='http://192.168.99.2:8080/v1/')
+
 
 # Inicialitzar whisper amb els següents paràmetres
 stt = STTAPI(file_name="tmp/tmp.wav", api_url="http://192.168.99.2:5092/v1/")
@@ -37,7 +39,7 @@ def historialText(history, promptText, language):
 
 while True:
     # Gravar amb detecció de silenci - Procés
-    gravacio = recordDetectSilenci()
+    gravacio = recordDetectSilenciSOTA()
 
     # Transcriure amb Whisper - Procés, extreure JSON i mostrar text
     outputSTT = stt.transcribe_stt()
@@ -51,7 +53,7 @@ while True:
     
     if(idioma == "es"):
         #TTSKokoroESP(text=respostaText)
-        TTSKokoroESP(api_url="http://192.168.99.2:4123/v1/", text=respostaText, voice="gladosesp")
+        TTSKokoroESP(api_url="http://192.168.99.2:8880/v1/", text=respostaText)
     else:
         TTSGoogle(text=respostaText, lang=idioma)
     

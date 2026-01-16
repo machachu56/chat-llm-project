@@ -85,7 +85,6 @@ class STTAPI:
         return transcript
     
 
-
 def recordDetectSilenci(output_filename="tmp/tmp.wav", threshold=10, silence_limit=1.5, debug=False):
     """
     Records audio from the microphone until silence is detected and saves it to a WAV file.
@@ -265,9 +264,9 @@ def TTSChatterBox(text, api_url, voice):
         for chunk in response.iter_bytes(chunk_size=1024):
             player.write(chunk)
 
-def TTSKokoroESP(text):
+def TTSKokoroESP(text, api_url):
     client = OpenAI(
-    base_url="http://100.73.165.91:8880/v1", api_key="x")
+    base_url=api_url, api_key="x")
     player = pyaudio.PyAudio().open(
     format=pyaudio.paInt16, 
     channels=1, 
@@ -279,7 +278,7 @@ def TTSKokoroESP(text):
         model="kokoro",
         voice="ef_dora",
         response_format="pcm",
-        input=text
+        input=str(text).replace("*", "")
     ) as response:
         for chunk in response.iter_bytes(chunk_size=1024):
             player.write(chunk)
